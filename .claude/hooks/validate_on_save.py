@@ -52,9 +52,18 @@ def main() -> int:
     if path.suffix != ".txt" or path.parent.name != "decks" or not path.is_file():
         return 0
 
-    # A budget can be set per deck with a "# Budget: 150" line; else CLAUDE.md default.
-    m = re.search(r"^#\s*budget:\s*\$?(\d+(?:\.\d+)?)", path.read_text(encoding="utf-8"), re.I | re.M)
-    budget = float(m.group(1)) if m else read_budget()
+    # A budget can be set per deck with a "# Budget: 150" line, or switched off
+    # with "# Budget: none" (used for precon upgrades, where only the cost of
+    # added cards counts). Otherwise the CLAUDE.md default applies.
+    deck_text = path.read_text(encoding="utf-8")
+    m = re.search(r"^#\s*budget:\s*\$?(\d+(?:\.\d+)?|none)\s*$", deck_text, re.I | re.M)
+    if m and m.group(1).lower() == "none":
+        budget = None
+        logger.debug("Budget check disabled for %s", path.name)
+    elif m:
+        budget = float(m.group(1))
+    else:
+        budget = read_budget()
 
     code, text = validate_deck.run(path, budget)
     if code == 0:
