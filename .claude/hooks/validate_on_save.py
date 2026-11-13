@@ -65,7 +65,22 @@ def main() -> int:
     else:
         budget = read_budget()
 
-    code, text = validate_deck.run(path, budget)
+    # "# Owned: decks/x-original.txt" prices only cards not in that list
+    # (so a precon you already own costs nothing). Path is relative to the
+    # project folder, or to the decklist's own folder.
+    owned_path = None
+    m = re.search(r"^#\s*owned:\s*(.+?)\s*$", deck_text, re.I | re.M)
+    if m:
+        candidate = Path(m.group(1))
+        for base in (PROJECT_DIR, path.parent):
+            if (base / candidate).is_file():
+                owned_path = base / candidate
+                break
+        else:
+            owned_path = PROJECT_DIR / candidate  # run() reports it as missing
+        logger.debug("Owned list for %s: %s", path.name, owned_path)
+
+    code, text = validate_deck.run(path, budget, owned_path)
     if code == 0:
         # Valid: tell Claude the result on stdout (shown in transcript), allow.
         print(text)

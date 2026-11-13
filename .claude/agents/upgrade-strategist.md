@@ -15,7 +15,7 @@ Do this:
 2. Find replacements that push hard toward your strategy, plus fixes for the deck's
    basics (ramp, draw, removal, mana base) if they are weak. Use EDHREC and Scryfall.
 3. Check each add on Scryfall: legal in Commander, inside the colour identity, USD price.
-4. Keep the total cost of adds within budget. Cuts must equal adds, so the deck stays at 100.
+4. Assume the user owns the precon: its cards are free, so only adds cost money. Keep the total cost of adds within budget. Cuts must equal adds, so the deck stays at 100.
 5. Stay **distinct** from the other paths you were given: avoid their key cards and themes.
 
 Return:

@@ -7,6 +7,8 @@ Checks:
   * every card inside the commander's colour identity
   * every card legal in Commander
   * total price (Scryfall USD) against an optional budget
+  * with --owned <decklist>, only cards NOT in that list are priced
+    (e.g. a precon you already own), so the budget covers new cards only
 
 Decklist format (plain text):
   # Commander: Card Name        <- one line per commander (partners allowed)
@@ -167,8 +169,10 @@ class Report:
 
     problems: list[str] = field(default_factory=list)
     prices: dict[str, float | None] = field(default_factory=dict)
-    total_price: float = 0.0
+    total_price: float = 0.0  # cost of cards you need to buy
     unpriced: list[str] = field(default_factory=list)
+    owned_count: int = 0  # cards skipped for pricing because you own them
+    priced_only_new: bool = False  # True when an owned list was supplied
 
     @property
     def ok(self) -> bool:
@@ -196,10 +200,16 @@ def _can_be_commander(card: dict) -> bool:
 def validate(
     deck: Decklist,
     budget: float | None = None,
+    owned: set[str] | None = None,
     fetch: Callable[[list[str]], tuple[dict[str, dict], list[str]]] = fetch_cards_from_scryfall,
 ) -> Report:
-    """Run all checks. `fetch` is injectable so tests can run offline."""
-    report = Report()
+    """Run all checks. `fetch` is injectable so tests can run offline.
+
+    `owned` is a set of lower-case card names you already have; those cards
+    are still rule-checked but cost US$0.
+    """
+    report = Report(priced_only_new=owned is not None)
+    owned = owned or set()
 
     # --- Structure checks that need no card data ---
     if not deck.commanders:
@@ -245,6 +255,11 @@ def validate(
         if legality != "legal":
             report.problems.append(f"{name} is {legality} in Commander.")
 
+        # Cards you already own are free: skip pricing them.
+        if name.lower() in owned:
+            report.owned_count += 1
+            continue
+
         # Price: Scryfall's default printing, non-foil USD.
         price_str = (card.get("prices") or {}).get("usd")
         price = float(price_str) if price_str else None
@@ -265,9 +280,13 @@ def format_report(deck: Decklist, report: Report, budget: float | None, top: int
     lines = [
         f"Commander(s): {', '.join(deck.commanders) or 'none'}",
         f"Cards: {deck.total}/100",
-        f"Total price (Scryfall USD, default printing): US${report.total_price:.2f}"
+        (f"Cost of NEW cards (Scryfall USD, default printing): US${report.total_price:.2f}"
+         if report.priced_only_new
+         else f"Total price (Scryfall USD, default printing): US${report.total_price:.2f}")
         + (f" / budget US${budget:.2f}" if budget is not None else ""),
     ]
+    if report.priced_only_new:
+        lines.append(f"Already owned (priced at $0): {report.owned_count} cards")
     priced = sorted(((p, n) for n, p in report.prices.items() if p is not None), reverse=True)
     if priced:
         lines.append(f"Most expensive {min(top, len(priced))}:")
@@ -279,12 +298,25 @@ def format_report(deck: Decklist, report: Report, budget: float | None, top: int
     return "\n".join(lines)
 
 
-def run(path: Path, budget: float | None) -> tuple[int, str]:
+def load_owned(owned_path: Path) -> set[str]:
+    """Read a decklist of cards you own and return their lower-case names."""
+    owned_deck = parse_decklist(owned_path.read_text(encoding="utf-8"))
+    names = {n.lower() for n in owned_deck.commanders} | {n.lower() for n in owned_deck.cards}
+    logger.info("Loaded %d owned card names from %s", len(names), owned_path)
+    return names
+
+
+def run(path: Path, budget: float | None, owned_path: Path | None = None) -> tuple[int, str]:
     """Validate a file; return (exit code, report text). Used by CLI and hook."""
-    logger.info("Validating %s (budget=%s)", path, budget)
+    logger.info("Validating %s (budget=%s, owned=%s)", path, budget, owned_path)
     deck = parse_decklist(path.read_text(encoding="utf-8"))
+    owned = None
+    if owned_path is not None:
+        if not owned_path.is_file():
+            return 1, f"Owned list not found: {owned_path}"
+        owned = load_owned(owned_path)
     try:
-        report = validate(deck, budget)
+        report = validate(deck, budget, owned)
     except ScryfallError as exc:
         logger.error("%s", exc)
         return 3, f"Could not validate {path.name}: {exc}"
@@ -296,7 +328,8 @@ def run(path: Path, budget: float | None) -> tuple[int, str]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("decklist", type=Path, help="path to the decklist .txt file")
-    parser.add_argument("--budget", type=float, default=None, help="max total price in USD")
+    parser.add_argument("--budget", type=float, default=None, help="max price in USD (of new cards if --owned)")
+    parser.add_argument("--owned", type=Path, default=None, help="decklist of cards you already own (priced at $0)")
     parser.add_argument("-v", "--verbose", action="store_true", help="show debug logging")
     args = parser.parse_args(argv)
     setup_logging(args.verbose)
@@ -304,7 +337,7 @@ def main(argv: list[str] | None = None) -> int:
     if not args.decklist.is_file():
         logger.error("File not found: %s", args.decklist)
         return 2
-    code, text = run(args.decklist, args.budget)
+    code, text = run(args.decklist, args.budget, args.owned)
     # The report is program output, not a diagnostic, so it goes to stdout.
     sys.stdout.write(text + "\n")
     return code

@@ -28,7 +28,9 @@ class HookBudgetTests(unittest.TestCase):
     def setUp(self):
         # Route validation through the fake card database instead of Scryfall.
         self._orig = vd.validate
-        vd.validate = lambda deck, budget=None, fetch=None: self._orig(deck, budget, fetch=fixtures.fake_fetch)
+        vd.validate = lambda deck, budget=None, owned=None, fetch=None: self._orig(
+            deck, budget, owned, fetch=fixtures.fake_fetch
+        )
         self.tmp = tempfile.TemporaryDirectory()
         (Path(self.tmp.name) / "decks").mkdir()
 
@@ -58,6 +60,17 @@ class HookBudgetTests(unittest.TestCase):
     def test_rules_still_checked_with_budget_none(self):
         bad = fixtures.make_deck().replace("1 Sol Ring\n98 Mountain", "2 Sol Ring\n97 Mountain")
         self.assertEqual(self.run_hook("# Budget: none\n" + bad), 2)
+
+    def test_owned_line_prices_only_new_cards(self):
+        # The "upgrade" equals the owned precon, so new-card cost is $0 and a
+        # $1 budget passes (it would fail on the ~US$13 whole-deck price).
+        (Path(self.tmp.name) / "decks" / "original.txt").write_text(fixtures.make_deck(), encoding="utf-8")
+        deck = "# Budget: 1\n# Owned: original.txt\n" + fixtures.make_deck()
+        self.assertEqual(self.run_hook(deck), 0)
+
+    def test_owned_line_missing_file_fails(self):
+        deck = "# Budget: 1\n# Owned: nope.txt\n" + fixtures.make_deck()
+        self.assertEqual(self.run_hook(deck), 2)
 
     def test_non_deck_file_ignored(self):
         payload = json.dumps({"tool_input": {"file_path": str(ROOT / "README.md")}})

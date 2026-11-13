@@ -8,6 +8,10 @@ arguments: [precon, budget]
 Upgrade the Commander precon **$precon**. Each upgrade path may spend up to
 **$budget** USD on new cards (if no budget was given, use the default in CLAUDE.md).
 
+**Pricing assumes the user already owns the precon.** Cards from the precon cost
+$0; only cards added from outside it count toward the budget. Cut cards give no
+refund.
+
 Pass each role only what it needs: its brief must stand alone.
 
 ## 1. Get the precon
@@ -34,11 +38,16 @@ Each returns a cut/add list. Save each report to `research/<precon-slug>/path-<n
 
 ## 4. Write and check the decklists
 For each path, apply its cuts and adds to the original list and write
-`decks/<precon-slug>-path-<n>-<strategy-slug>.txt` with `# Commander:` and
-`# Budget: none` lines at the top (the budget applies to *added* cards only, not
-the whole deck). The save hook validates each one. If it fails, fix and re-save.
-Then add up the Scryfall price of each path's added cards; use the
-**budget-checker** subagent on any path over budget, and apply its swaps.
+`decks/<precon-slug>-path-<n>-<strategy-slug>.txt` with these lines at the top:
+```
+# Commander: <commander>
+# Budget: <budget>
+# Owned: decks/<precon-slug>-original.txt
+```
+The `# Owned:` line makes the validator price only cards NOT in the precon, so
+the budget check covers new cards only. The save hook validates each list; if
+it fails (including over budget), use the **budget-checker** subagent on that
+path, apply its swaps, and re-save.
 
 ## 5. Compare and let the user choose
 Write `decks/<precon-slug>-upgrades.md` with a comparison table:

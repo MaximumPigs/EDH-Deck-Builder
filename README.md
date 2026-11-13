@@ -24,6 +24,7 @@ Claude will show you game plans and ask you to pick one, then build the deck.
 ```
 - 1st argument: precon name (in quotes)
 - 2nd argument: budget per upgrade path in USD (optional, default in CLAUDE.md)
+- Assumes you **own the precon**: its cards cost $0, only new cards count toward the budget
 
 Claude finds the official list, builds **3 upgrade paths with different strategies**
 (in parallel), validates each, shows a comparison, then writes a primer for the one you pick.
@@ -51,7 +52,8 @@ Output:
 | Script | `scripts/validate_deck.py` | The checker. Run it yourself too: `python3 scripts/validate_deck.py decks/x.txt --budget 100` |
 
 ## Notes
-- Add `# Budget: 150` to a decklist to set its total budget, or `# Budget: none` to skip the price check.
+- Add `# Budget: 150` to a decklist to set its budget, or `# Budget: none` to skip the price check.
+- Add `# Owned: decks/<file>.txt` to price only cards not in that list (cards you own cost $0). Command line: `--owned decks/<file>.txt`.
 - Prices are Scryfall's USD price for its default printing, so the cheapest printing may cost less.
 - The validator needs internet access to reach Scryfall.
 - Logs: `logs/validate.log`. Tests (offline): `python3 -m unittest discover tests`.
