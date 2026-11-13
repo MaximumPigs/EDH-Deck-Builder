@@ -93,6 +93,20 @@ class ValidateTests(unittest.TestCase):
         report = self.check(text)
         self.assertTrue(any("not found" in p for p in report.problems))
 
+    def test_owned_cards_cost_nothing(self):
+        # Own Krenko + Sol Ring; only the 98 Mountains (US$9.80) are new.
+        owned = {"krenko, mob boss", "sol ring"}
+        report = vd.validate(vd.parse_decklist(make_deck()), budget=10, owned=owned, fetch=fake_fetch)
+        self.assertTrue(report.ok, report.problems)
+        self.assertAlmostEqual(report.total_price, 98 * 0.10)
+        self.assertEqual(report.owned_count, 2)
+
+    def test_owned_still_rule_checked(self):
+        # Owning a card doesn't make it legal: banned owned card still fails.
+        text = make_deck().replace("98 Mountain", "97 Mountain\n1 Mana Crypt")
+        report = vd.validate(vd.parse_decklist(text), owned={"mana crypt"}, fetch=fake_fetch)
+        self.assertTrue(any("banned" in p for p in report.problems))
+
     def test_over_budget(self):
         report = self.check(make_deck(), budget=5)
         self.assertTrue(any("Over budget" in p for p in report.problems))

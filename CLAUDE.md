@@ -1,10 +1,10 @@
 # EDH Deck Builder
 
-Builds budget Commander (EDH) decks from a named commander, with a primer.
+Builds budget Commander (EDH) decks from a named commander, and upgrades precons into 3 distinct strategies, with primers.
 
 ## Rules (always apply)
 - Commander format: exactly 100 cards including the commander, singleton (except basic lands and cards that say otherwise), every card inside the commander's colour identity, every card legal in Commander.
-- Default budget: US$100 total unless the user names one. Use Scryfall prices (USD) as the price source.
+- Default budget: US$100 total unless the user names one. For precon upgrades, assume the user already owns the precon: the budget is per upgrade path and covers only cards added from outside it. Use Scryfall prices (USD) as the price source.
 - Never invent cards. Every card name must exist on Scryfall, spelled exactly.
 - Decklists go in `decks/<commander-slug>.txt`, one card per line as `1 Card Name`, with `# Commander: <name>` at the top.
 - Research notes go in `research/<commander-slug>/`. Primers go in `decks/<commander-slug>-primer.md`.
