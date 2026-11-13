@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(python3 scripts/validate_deck.py *)",
+      "WebFetch(domain:scryfall.com)",
+      "WebFetch(domain:api.scryfall.com)",
+      "WebFetch(domain:edhrec.com)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/validate_on_save.py"
+          }
+        ]
+      }
+    ]
+  }
+}
