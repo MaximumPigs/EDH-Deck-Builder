@@ -5,7 +5,10 @@
       "Bash(python3 scripts/validate_deck.py *)",
       "WebFetch(domain:scryfall.com)",
       "WebFetch(domain:api.scryfall.com)",
-      "WebFetch(domain:edhrec.com)"
+      "WebFetch(domain:edhrec.com)",
+      "Bash(python scripts/validate_deck.py *)",
+      "Bash(python3 scripts/scryfall_lookup.py *)",
+      "Bash(python scripts/scryfall_lookup.py *)"
     ]
   },
   "hooks": {
