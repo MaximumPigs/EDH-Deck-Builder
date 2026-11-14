@@ -35,6 +35,16 @@ Output:
 - `research/<commander>/` - what the agents found
 - For upgrades: `decks/<precon>-original.txt`, `decks/<precon>-path-<n>-<strategy>.txt`, `decks/<precon>-upgrades.md` (comparison)
 
+## Use your collection (optional)
+1. In ManaBox (Android/iOS): **Collection** tab, then the top-right menu, then **Export**, then **CSV**.
+2. Save the file as `collection/manabox.csv` in this folder.
+3. That's it. Cards you own now cost $0, the agents prefer them, and every
+   decklist check ends with a **TO BUY** list. Re-export whenever your collection changes.
+
+- `python3 scripts/collection.py summary` shows card counts per binder.
+- Add `# Collection: off` to a decklist to ignore your collection for that deck.
+- `collection/*.csv` is git-ignored, so your collection and purchase prices stay off GitHub.
+
 ## What's in here and why
 
 | Piece | File | What it does |
@@ -49,6 +59,7 @@ Output:
 | Role | `.claude/agents/budget-checker.md` | Prices the deck and suggests cheaper swaps (cheap model) |
 | Role | `.claude/agents/primer-writer.md` | Writes the how-to-play guide (can't browse) |
 | Hook | `.claude/settings.json` + `.claude/hooks/validate_on_save.py` | Every time a decklist is saved, checks 100 cards, singleton, colour identity, bans and budget. Problems go straight back to Claude to fix |
+| Script | `scripts/collection.py` | Reads your ManaBox export and lists what you own |
 | Script | `scripts/validate_deck.py` | The checker. Run it yourself too: `python3 scripts/validate_deck.py decks/x.txt --budget 100` |
 
 ## Notes

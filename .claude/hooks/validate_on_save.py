@@ -21,6 +21,9 @@ sys.path.insert(0, str(PROJECT_DIR / "scripts"))
 
 import validate_deck  # noqa: E402  (import after sys.path tweak)
 
+# Your ManaBox export (Collection > Export > CSV). Optional.
+COLLECTION_FILE = PROJECT_DIR / "collection" / "manabox.csv"
+
 logger = logging.getLogger("validate_deck.hook")
 
 
@@ -65,22 +68,25 @@ def main() -> int:
     else:
         budget = read_budget()
 
-    # "# Owned: decks/x-original.txt" prices only cards not in that list
-    # (so a precon you already own costs nothing). Path is relative to the
-    # project folder, or to the decklist's own folder.
-    owned_path = None
-    m = re.search(r"^#\s*owned:\s*(.+?)\s*$", deck_text, re.I | re.M)
-    if m:
+    # Cards you own are priced at $0, so the budget covers cards to buy.
+    # Sources: every "# Owned: <path>" line (e.g. the precon you own), plus your
+    # ManaBox collection export at collection/manabox.csv if it exists.
+    # "# Collection: off" ignores the collection for this deck.
+    owned_paths: list[Path] = []
+    for m in re.finditer(r"^#\s*owned:\s*(.+?)\s*$", deck_text, re.I | re.M):
         candidate = Path(m.group(1))
         for base in (PROJECT_DIR, path.parent):
             if (base / candidate).is_file():
-                owned_path = base / candidate
+                owned_paths.append(base / candidate)
                 break
         else:
-            owned_path = PROJECT_DIR / candidate  # run() reports it as missing
-        logger.debug("Owned list for %s: %s", path.name, owned_path)
+            owned_paths.append(PROJECT_DIR / candidate)  # run() reports it as missing
+    collection_off = re.search(r"^#\s*collection:\s*off\s*$", deck_text, re.I | re.M)
+    if COLLECTION_FILE.is_file() and not collection_off:
+        owned_paths.append(COLLECTION_FILE)
+    logger.debug("Owned sources for %s: %s", path.name, owned_paths)
 
-    code, text = validate_deck.run(path, budget, owned_path)
+    code, text = validate_deck.run(path, budget, owned_paths or None)
     if code == 0:
         # Valid: tell Claude the result on stdout (shown in transcript), allow.
         print(text)

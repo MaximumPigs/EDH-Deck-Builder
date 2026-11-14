@@ -14,6 +14,12 @@ refund.
 
 Pass each role only what it needs: its brief must stand alone.
 
+## 0. Check the collection
+If `collection/manabox.csv` exists, run
+`python3 scripts/collection.py names --out research/owned-cards.txt`.
+Cards the user owns cost $0 and should be preferred when they fit the plan.
+Pass `research/owned-cards.txt` to every role that picks cards.
+
 ## 1. Get the precon
 Use the **precon-analyst** subagent. It finds the official decklist, the face
 commander (and any alternate commanders in the box), and its weaknesses.
@@ -33,7 +39,8 @@ a third of their adds, replace one.
 ## 3. Build the 3 paths (in parallel)
 Run 3 **upgrade-strategist** subagents in parallel, one per path. Give each:
 the original decklist path, the commander, its colour identity, its one-line
-strategy, the budget, and the other two strategies (so it stays distinct).
+strategy, the budget, the other two strategies (so it stays distinct), and the
+owned-cards file if there is one.
 Each returns a cut/add list. Save each report to `research/<precon-slug>/path-<n>.md`.
 
 ## 4. Write and check the decklists
@@ -44,8 +51,9 @@ For each path, apply its cuts and adds to the original list and write
 # Budget: <budget>
 # Owned: decks/<precon-slug>-original.txt
 ```
-The `# Owned:` line makes the validator price only cards NOT in the precon, so
-the budget check covers new cards only. The save hook validates each list; if
+The `# Owned:` line makes the validator price only cards NOT in the precon. If
+`collection/manabox.csv` exists, the hook also treats the user's collection as
+owned, so the budget check covers only cards the user must buy. The save hook validates each list; if
 it fails (including over budget), use the **budget-checker** subagent on that
 path, apply its swaps, and re-save.
 
