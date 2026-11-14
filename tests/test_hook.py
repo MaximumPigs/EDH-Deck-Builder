@@ -33,9 +33,13 @@ class HookBudgetTests(unittest.TestCase):
         )
         self.tmp = tempfile.TemporaryDirectory()
         (Path(self.tmp.name) / "decks").mkdir()
+        # Ignore any real collection on this machine; tests opt in explicitly.
+        self._orig_collection = hook.COLLECTION_FILE
+        hook.COLLECTION_FILE = Path(self.tmp.name) / "no-collection.csv"
 
     def tearDown(self):
         vd.validate = self._orig
+        hook.COLLECTION_FILE = self._orig_collection
         self.tmp.cleanup()
 
     def run_hook(self, deck_text):
@@ -70,6 +74,17 @@ class HookBudgetTests(unittest.TestCase):
 
     def test_owned_line_missing_file_fails(self):
         deck = "# Budget: 1\n# Owned: nope.txt\n" + fixtures.make_deck()
+        self.assertEqual(self.run_hook(deck), 2)
+
+    def test_collection_file_makes_owned_cards_free(self):
+        # Krenko+Sol Ring+98 Mountains costs ~US$13.30; owning Sol Ring
+        # (US$1.50) via the collection brings it under a US$12 budget.
+        hook.COLLECTION_FILE = ROOT / "tests" / "fixtures" / "manabox_sample.csv"
+        self.assertEqual(self.run_hook("# Budget: 12\n" + fixtures.make_deck()), 0)
+
+    def test_collection_off_line_ignores_collection(self):
+        hook.COLLECTION_FILE = ROOT / "tests" / "fixtures" / "manabox_sample.csv"
+        deck = "# Budget: 12\n# Collection: off\n" + fixtures.make_deck()
         self.assertEqual(self.run_hook(deck), 2)
 
     def test_non_deck_file_ignored(self):

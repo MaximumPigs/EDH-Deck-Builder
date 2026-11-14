@@ -7,8 +7,9 @@ Checks:
   * every card inside the commander's colour identity
   * every card legal in Commander
   * total price (Scryfall USD) against an optional budget
-  * with --owned <decklist>, only cards NOT in that list are priced
-    (e.g. a precon you already own), so the budget covers new cards only
+  * with --owned <file> (repeatable), only cards NOT owned are priced, so the
+    budget covers cards you need to buy. <file> can be a decklist (e.g. a precon
+    you own) or a ManaBox collection CSV export.
 
 Decklist format (plain text):
   # Commander: Card Name        <- one line per commander (partners allowed)
@@ -255,8 +256,9 @@ def validate(
         if legality != "legal":
             report.problems.append(f"{name} is {legality} in Commander.")
 
-        # Cards you already own are free: skip pricing them.
-        if name.lower() in owned:
+        # Cards you already own are free: skip pricing them. Match on the name
+        # as written and on Scryfall's canonical name (handles "A // B" cards).
+        if name.lower() in owned or card.get("name", "").lower() in owned:
             report.owned_count += 1
             continue
 
@@ -288,7 +290,11 @@ def format_report(deck: Decklist, report: Report, budget: float | None, top: int
     if report.priced_only_new:
         lines.append(f"Already owned (priced at $0): {report.owned_count} cards")
     priced = sorted(((p, n) for n, p in report.prices.items() if p is not None), reverse=True)
-    if priced:
+    if priced and report.priced_only_new:
+        # With an owned list, every priced card is one to buy: list them all.
+        lines.append(f"TO BUY ({len(priced)} cards):")
+        lines += [f"  US${p:>7.2f}  {n}" for p, n in priced]
+    elif priced:
         lines.append(f"Most expensive {min(top, len(priced))}:")
         lines += [f"  US${p:>7.2f}  {n}" for p, n in priced[:top]]
     if report.unpriced:
@@ -299,22 +305,40 @@ def format_report(deck: Decklist, report: Report, budget: float | None, top: int
 
 
 def load_owned(owned_path: Path) -> set[str]:
-    """Read a decklist of cards you own and return their lower-case names."""
+    """Return lower-case names of cards you own, from a decklist or ManaBox CSV."""
+    if owned_path.suffix.lower() == ".csv":
+        # Imported here so the validator still works without collection.py nearby.
+        from collection import load_collection
+        return set(load_collection(owned_path))
     owned_deck = parse_decklist(owned_path.read_text(encoding="utf-8"))
     names = {n.lower() for n in owned_deck.commanders} | {n.lower() for n in owned_deck.cards}
     logger.info("Loaded %d owned card names from %s", len(names), owned_path)
     return names
 
 
-def run(path: Path, budget: float | None, owned_path: Path | None = None) -> tuple[int, str]:
-    """Validate a file; return (exit code, report text). Used by CLI and hook."""
-    logger.info("Validating %s (budget=%s, owned=%s)", path, budget, owned_path)
+def run(
+    path: Path, budget: float | None, owned_paths: Path | list[Path] | None = None
+) -> tuple[int, str]:
+    """Validate a file; return (exit code, report text). Used by CLI and hook.
+
+    `owned_paths` may be one path or a list (e.g. the precon + your collection);
+    their owned cards are combined.
+    """
+    if isinstance(owned_paths, Path):
+        owned_paths = [owned_paths]
+    logger.info("Validating %s (budget=%s, owned=%s)", path, budget, owned_paths)
     deck = parse_decklist(path.read_text(encoding="utf-8"))
     owned = None
-    if owned_path is not None:
-        if not owned_path.is_file():
-            return 1, f"Owned list not found: {owned_path}"
-        owned = load_owned(owned_path)
+    if owned_paths:
+        owned = set()
+        for owned_path in owned_paths:
+            if not owned_path.is_file():
+                return 1, f"Owned list not found: {owned_path}"
+            try:
+                owned |= load_owned(owned_path)
+            except (ValueError, OSError) as exc:
+                logger.error("Could not read %s: %s", owned_path, exc)
+                return 1, f"Could not read owned list {owned_path}: {exc}"
     try:
         report = validate(deck, budget, owned)
     except ScryfallError as exc:
@@ -329,7 +353,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("decklist", type=Path, help="path to the decklist .txt file")
     parser.add_argument("--budget", type=float, default=None, help="max price in USD (of new cards if --owned)")
-    parser.add_argument("--owned", type=Path, default=None, help="decklist of cards you already own (priced at $0)")
+    parser.add_argument("--owned", type=Path, action="append", default=None,
+                        help="decklist or ManaBox CSV of cards you own (priced at $0); repeatable")
     parser.add_argument("-v", "--verbose", action="store_true", help="show debug logging")
     args = parser.parse_args(argv)
     setup_logging(args.verbose)
